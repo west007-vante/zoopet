@@ -195,21 +195,67 @@ function mountScrollWorld(container, config) {
     window.scrollTo({ top: seg.start + (seg.end - seg.start) * 0.5, behavior: reduce ? 'auto' : 'smooth' });
   }
 
-  function makeVideo(s, src) {
-    const v = document.createElement('video');
-    v.className = 'sw-scene__video';
-    v.muted = true; v.playsInline = true; v.preload = 'auto';
-    v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-    v.src = src;
-    v.addEventListener('loadedmetadata', () => { s.ready = true; read(); });
-    // Reveal the video (hide the still poster) only once a real frame has
-    // painted — on iOS a seeked-but-never-played muted video stays blank, so
-    // hiding the still on metadata alone would flash an empty scene.
-    v.addEventListener('seeked', () => { s.el.classList.add('has-clip'); }, { once: true });
-    v.addEventListener('loadeddata', () => { try { v.pause(); } catch (e) {} if (userReady) primeVideo(v); });
+  // ---- video elements -------------------------------------------------------
+  // Desktop keeps one <video> per segment (simplest, and a laptop decodes a dozen without
+  // complaining). PHONES DO NOT: iOS Safari only keeps a handful of <video> elements
+  // decoding at once, and past that limit new ones silently stay blank — which looked
+  // exactly like "the animation stops working after the third scene". So on a phone the
+  // engine owns a POOL of two elements and lends them to whichever segments are on screen
+  // (two, because a seam crossfades between neighbours). They are created once, up front,
+  // so the first touch primes both for good — a video element created later would need a
+  // fresh gesture that never comes.
+  const POOL = [];
+  function buildPool() {
+    if (!isMobile() || POOL.length) return;
+    for (let k = 0; k < 2; k++) {
+      const v = document.createElement('video');
+      v.className = 'sw-scene__video';
+      v.muted = true; v.playsInline = true; v.preload = 'auto';
+      v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+      v.setAttribute('webkit-playsinline', '');
+      v.free = true; POOL.push(v);
+    }
+  }
+
+  function wire(s, v) {
+    s.handlers = [
+      ['loadedmetadata', () => { s.ready = true; read(); }],
+      // Reveal the video (hide the still poster) only once a real frame has
+      // painted — on iOS a seeked-but-never-played muted video stays blank, so
+      // hiding the still on metadata alone would flash an empty scene.
+      ['seeked', () => { s.el.classList.add('has-clip'); }],
+      ['loadeddata', () => { try { v.pause(); } catch (e) {} if (userReady) primeVideo(v); }],
+    ];
+    s.handlers.forEach(([ev, fn]) => v.addEventListener(ev, fn));
     s.el.appendChild(v); s.video = v; s.hasClip = true;
   }
 
+  function lend(s) {                       // phone: give this segment one of the two videos
+    if (s.video || !s.blobUrl) return;
+    let v = POOL.find(x => x.free);
+    if (!v) {                              // both busy: take the one furthest from the camera
+      const victim = SEGMENTS.filter(o => o.video && o !== s)
+        .sort((a, b) => Math.abs(b.start - curY) - Math.abs(a.start - curY))[0];
+      if (!victim) return;
+      takeBack(victim);
+      v = POOL.find(x => x.free);
+      if (!v) return;
+    }
+    v.free = false; s.cur = s.target;      // start from where the scroll already is
+    wire(s, v); v.src = s.blobUrl;
+  }
+
+  function takeBack(s) {
+    const v = s.video; if (!v) return;
+    (s.handlers || []).forEach(([ev, fn]) => v.removeEventListener(ev, fn));
+    try { v.pause(); } catch (e) {}
+    v.removeAttribute('src'); try { v.load(); } catch (e) {}
+    if (v.parentNode) v.parentNode.removeChild(v);
+    v.free = true; s.video = null; s.handlers = null;
+    s.ready = false; s.hasClip = false; s.el.classList.remove('has-clip');
+  }
+
+  let curY = 0;       // última posição lida (usada para escolher quem devolve o vídeo)
   let fetching = 0;   // phones: how many clips are downloading right now
   function loadClip(s, priority) {
     // Under prefers-reduced-motion we never load the clips at all — the stills stay up
@@ -228,13 +274,21 @@ function mountScrollWorld(container, config) {
     // frame 0 — the clip paints but never animates. The phone fix is weight, not streaming:
     // small `-m.mp4` encodes plus the tighter prefetch window below.
     fetch(url).then(r => r.ok ? r.blob() : Promise.reject(new Error('404')))
-      .then(blob => makeVideo(s, URL.createObjectURL(blob)))
+      .then(blob => {
+        s.blobUrl = URL.createObjectURL(blob);
+        if (isMobile()) { read(); return; }
+        const v = document.createElement('video');
+        v.className = 'sw-scene__video'; v.muted = true; v.playsInline = true; v.preload = 'auto';
+        v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+        wire(s, v); v.src = s.blobUrl;
+      })
       .catch((e) => { s.loading = false; if (window.console) console.warn('[scroll-world] clipe falhou:', url, e && e.message); })
       .finally(() => { fetching--; read(); });   // libera a fila e reavalia o que carregar
   }
 
   function read() {
     const y = window.scrollY || window.pageYOffset;
+    curY = y;
     const fade = CROSSFADE * vh;
     let ci = 0;
     for (let i = 0; i < NSEG; i++) if (y >= SEGMENTS[i].start) ci = i;
@@ -255,6 +309,15 @@ function mountScrollWorld(container, config) {
       if (!s.hasClip || !s.ready) {
         const sc = reduce ? 1 : 1.03 + local * 0.14;
         s.img.style.transform = `translateX(${stageX - 2}vw) scale(${sc.toFixed(3)})`;
+      }
+    }
+
+    if (isMobile() && !reduce) {
+      // Só as cenas realmente na tela ficam com um dos dois vídeos; as outras devolvem.
+      // Sem isso o telefone acumula elementos de vídeo e o Safari para de decodificar.
+      for (let i = 0; i < NSEG; i++) {
+        const s = SEGMENTS[i];
+        if (s.visible) lend(s); else if (s.video) takeBack(s);
       }
     }
 
@@ -318,12 +381,14 @@ function mountScrollWorld(container, config) {
   function onFirstGesture() {
     if (userReady) return;
     userReady = true;
+    POOL.forEach(primeVideo);
     SEGMENTS.forEach(s => primeVideo(s.video));
   }
   window.addEventListener('pointerdown', onFirstGesture, { once: true, passive: true });
   window.addEventListener('touchstart', onFirstGesture, { once: true, passive: true });
 
   // Particles are a per-frame cost we can't afford alongside video scrubbing on a phone.
+  buildPool();
   seedParticles(particles, reduce || coarse);
   window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(read); } }, { passive: true });
   // Mobile browsers fire `resize` every time the URL bar slides in/out. Re-running

@@ -122,6 +122,23 @@
         { threshold: 0.12 }
       ).observe(rodape);
     }
+    // ?diag=1 → painel de diagnóstico para testar no celular de verdade (print e me manda)
+    if (location.search.includes('diag')) {
+      const d = document.createElement('div');
+      d.style.cssText = 'position:fixed;left:8px;top:8px;z-index:999;background:rgba(0,0,0,.82);color:#0f0;font:11px/1.35 ui-monospace,monospace;padding:8px 10px;border-radius:6px;pointer-events:none;white-space:pre';
+      document.body.appendChild(d);
+      const nav = navigator.connection || {};
+      setInterval(() => {
+        const cenas = [...document.querySelectorAll('.sw-scene')];
+        const vis = cenas.filter(e => +getComputedStyle(e).opacity > 0.5);
+        const v = vis[0] && vis[0].querySelector('video');
+        d.textContent = 'videos no DOM: ' + document.querySelectorAll('video').length
+          + '\ncena visivel: ' + cenas.indexOf(vis[0]) + (vis[0] && vis[0].classList.contains('has-clip') ? ' PINTOU' : ' still')
+          + '\ntempo do clipe: ' + (v ? v.currentTime.toFixed(1) + 's rs' + v.readyState + (v.error ? ' ERRO' + v.error.code : '') : '-')
+          + '\nrede: ' + (nav.effectiveType || '?') + ' ' + (nav.downlink || '?') + 'Mb'
+          + '\nrolagem: ' + Math.round(scrollY) + '/' + (document.documentElement.scrollHeight - innerHeight);
+      }, 400);
+    }
   </script>
 </body>
 </html>
