@@ -206,36 +206,56 @@ function mountScrollWorld(container, config) {
   const useSeq = (s) => isMobile() && !reduce && !!s.framesM;
   const frameUrl = (f, k) => f.dir + '/f_' + String(k + 1).padStart(3, '0') + '.jpg';
 
+  // Ordem de carregamento em PASSADAS (8 em 8, depois 4, 2 e 1). Carregar do quadro 1 ao 40
+  // em sequência parece pior do que é: quem chega na cena antes do download terminar vê a
+  // primeira metade animar e a segunda congelada. Com passadas, os quadros disponíveis
+  // cobrem a cena inteira desde o começo — o movimento nasce grosso e vai ficando fino.
+  function ordemPassadas(total) {
+    const ordem = [], visto = new Set();
+    for (const passo of [8, 4, 2, 1])
+      for (let k = 0; k < total; k += passo)
+        if (!visto.has(k)) { visto.add(k); ordem.push(k); }
+    return ordem;
+  }
+
   function loadSeq(s, priority) {
     if (s.seqLoading || !s.framesM) return;
-    if (fetching > 0 && !priority) return;         // uma cena por vez, como nos clipes
+    if (fetching > 0 && !priority) return;         // uma cena por vez
     s.seqLoading = true; fetching++;
-    const f = s.framesM, total = f.n;
+    const f = s.framesM, total = f.n, ordem = ordemPassadas(total);
     s.imgs = new Array(total); s.imgReady = 0;
-    let next = 0, alive = 0;
+    let next = 0, alive = 0, liberou = false;
+    const solta = () => { if (!liberou) { liberou = true; fetching--; read(); } };
     const pump = () => {
-      while (alive < 6 && next < total) {
-        const k = next++; alive++;
+      while (alive < 4 && next < ordem.length) {
+        const k = ordem[next++]; alive++;
         const im = new Image(); im.decoding = 'async';
         im.onload = () => {
           s.imgs[k] = im; s.imgReady++; alive--;
-          if (k === 0) { showSeq(s); }
-          if (s.imgReady === total) { s.ready = true; }
+          if (s.imgReady === 1) showSeq(s);
+          // Depois da 2ª passada a cena já anima de ponta a ponta: libera a fila para a
+          // próxima cena começar a chegar enquanto esta termina de encorpar.
+          if (s.imgReady >= Math.ceil(total / 4)) solta();
+          if (s.imgReady === total) s.ready = true;
           pump(); read();
         };
         im.onerror = () => { alive--; pump(); };
         im.src = frameUrl(f, k);
       }
-      if (next >= total && alive === 0) { fetching--; read(); }
+      if (next >= ordem.length && alive === 0) solta();
     };
     pump();
   }
 
   function showSeq(s) {
     if (s.seqEl) return;
+    // Com carregamento em passadas o primeiro quadro a chegar pode não ser o de índice 0
+    // (quatro descem em paralelo); use o que existir, senão a cena morre com TypeError.
+    const pronto = s.imgs && s.imgs.find(Boolean);
+    if (!pronto) return;
     const im = document.createElement('img');
     im.className = 'sw-scene__video'; im.alt = ''; im.decoding = 'async';
-    im.src = s.imgs[0].src;
+    im.src = pronto.src;
     s.el.appendChild(im); s.seqEl = im; s.hasClip = true; s.ready = true;
     s.el.classList.add('has-clip');
   }
