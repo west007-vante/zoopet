@@ -87,7 +87,7 @@ function mountScrollWorld(container, config) {
   const SEGMENTS = [];
   SECTIONS.forEach((s, i) => {
     const dive = { kind: 'dive', si: i, clip: s.clip, clipM: s.clipMobile, still: s.still, stillM: s.stillMobile,
-                   accent: s.accent, w: s.scroll || DIVE_W, linger: s.linger || 0 };
+                   framesM: s.framesM, accent: s.accent, w: s.scroll || DIVE_W, linger: s.linger || 0 };
     SEGMENTS.push(dive);
     s._seg = dive;
     // A connector is optional: if connectors[i] is falsy, the two dives simply
@@ -95,6 +95,7 @@ function mountScrollWorld(container, config) {
     // connector can't be generated (e.g. a content-filter false-positive).
     if (i < N - 1 && CONNECTORS[i]) {
       SEGMENTS.push({ kind: 'conn', si: i, clip: CONNECTORS[i], clipM: CONNECTORS_M[i],
+                      framesM: (config.connectorsFramesM || [])[i],
                       still: SECTIONS[i + 1].still, stillM: SECTIONS[i + 1].stillMobile,
                       accent: SECTIONS[i + 1].accent, w: CONN_W });
     }
@@ -195,6 +196,64 @@ function mountScrollWorld(container, config) {
     window.scrollTo({ top: seg.start + (seg.end - seg.start) * 0.5, behavior: reduce ? 'auto' : 'smooth' });
   }
 
+
+  // ---- PHONE: frame sequence instead of video ---------------------------------
+  // Scrubbing a <video> is a desktop technique. On a real iPhone it fights the platform:
+  // a limited number of decoders, playback that needs a user gesture, and seeks that the
+  // decoder may simply drop. A scrubbed JPEG sequence has none of that — it is what Apple
+  // itself ships on its product pages. Same bytes as the mp4, no decoder involved, and it
+  // degrades gracefully: whatever frames have arrived are the frames we draw.
+  const useSeq = (s) => isMobile() && !reduce && !!s.framesM;
+  const frameUrl = (f, k) => f.dir + '/f_' + String(k + 1).padStart(3, '0') + '.jpg';
+
+  function loadSeq(s, priority) {
+    if (s.seqLoading || !s.framesM) return;
+    if (fetching > 0 && !priority) return;         // uma cena por vez, como nos clipes
+    s.seqLoading = true; fetching++;
+    const f = s.framesM, total = f.n;
+    s.imgs = new Array(total); s.imgReady = 0;
+    let next = 0, alive = 0;
+    const pump = () => {
+      while (alive < 6 && next < total) {
+        const k = next++; alive++;
+        const im = new Image(); im.decoding = 'async';
+        im.onload = () => {
+          s.imgs[k] = im; s.imgReady++; alive--;
+          if (k === 0) { showSeq(s); }
+          if (s.imgReady === total) { s.ready = true; }
+          pump(); read();
+        };
+        im.onerror = () => { alive--; pump(); };
+        im.src = frameUrl(f, k);
+      }
+      if (next >= total && alive === 0) { fetching--; read(); }
+    };
+    pump();
+  }
+
+  function showSeq(s) {
+    if (s.seqEl) return;
+    const im = document.createElement('img');
+    im.className = 'sw-scene__video'; im.alt = ''; im.decoding = 'async';
+    im.src = s.imgs[0].src;
+    s.el.appendChild(im); s.seqEl = im; s.hasClip = true; s.ready = true;
+    s.el.classList.add('has-clip');
+  }
+
+  function drawSeq(s) {
+    if (!s.seqEl || !s.imgs) return;
+    const total = s.framesM.n;
+    let k = Math.round(clamp(s.cur, 0, 1) * (total - 1));
+    if (!s.imgs[k]) {                      // ainda não chegou: usa o quadro pronto mais próximo
+      let a = k; while (a >= 0 && !s.imgs[a]) a--;
+      if (a < 0) { let b = k; while (b < total && !s.imgs[b]) b++; a = b; }
+      k = a;
+    }
+    const im = s.imgs[k];
+    if (!im || k === s.drawnK) return;
+    s.seqEl.src = im.src; s.drawnK = k;
+  }
+
   // ---- video elements -------------------------------------------------------
   // Desktop keeps one <video> per segment (simplest, and a laptop decodes a dozen without
   // complaining). PHONES DO NOT: iOS Safari only keeps a handful of <video> elements
@@ -261,6 +320,7 @@ function mountScrollWorld(container, config) {
     // Under prefers-reduced-motion we never load the clips at all — the stills stay up
     // and simply cross-dissolve as you scroll. No scrubbed video motion, no decode cost.
     if (reduce || s.loading || !s.clip) return;
+    if (useSeq(s)) { loadSeq(s, priority); return; }   // celular com quadros: nada de vídeo
     // One clip at a time on a phone (the scene you're in may always jump the queue).
     // Eleven parallel downloads on mobile data share the pipe so evenly that the clip you
     // are actually looking at arrives last; queueing makes the current scene land first.
@@ -317,6 +377,7 @@ function mountScrollWorld(container, config) {
       // Sem isso o telefone acumula elementos de vídeo e o Safari para de decodificar.
       for (let i = 0; i < NSEG; i++) {
         const s = SEGMENTS[i];
+        if (useSeq(s)) continue;
         if (s.visible) lend(s); else if (s.video) takeBack(s);
       }
     }
@@ -354,6 +415,12 @@ function mountScrollWorld(container, config) {
     const eps = isMobile() ? 0.02 : 0.008;   // coarser seek step on phones = fewer decodes
     for (let i = 0; i < NSEG; i++) {
       const s = SEGMENTS[i];
+      if (useSeq(s)) {
+        if (!s.visible && Math.abs(s.cur - s.target) < 0.002) continue;
+        s.cur += (s.target - s.cur) * (reduce ? 1 : 0.18);
+        drawSeq(s);
+        continue;
+      }
       if (!s.hasClip || !s.ready || !s.video) continue;
       // Never queue a seek while the decoder is still resolving the last one.
       // On phones a fast flick would otherwise pile up seeks and freeze the clip;
