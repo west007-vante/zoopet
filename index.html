@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Zoopet Shop and Care — clínica veterinária e pet shop</title>
+  <meta name="description" content="Zoopet Shop and Care: clínica veterinária, banho e tosa e pet shop para cães e gatos. Rua Mato Grosso, 2071." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Figtree:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root, .sw-root {
+      --sw-bg: #F3EAE0;
+      --sw-ink: #2E3A3F;
+      --sw-ink-soft: #6B7A7E;
+      --sw-accent: #D98A6A;
+      --sw-font-display: "Fraunces", Georgia, serif;
+      --sw-font-body: "Figtree", -apple-system, sans-serif;
+    }
+    html, body { margin: 0; background: var(--sw-bg); color: var(--sw-ink); font-family: var(--sw-font-body); }
+    /* fecho real depois do voo: onde, quando, como agendar */
+    .vp-fim { position: relative; z-index: 5; background: var(--sw-ink); color: #F4EDE3; padding: 96px 24px 56px; }
+    .vp-fim__in { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1.3fr 1fr; gap: 64px; align-items: end; }
+    .vp-fim h2 { font-family: var(--sw-font-display); font-weight: 800; font-size: clamp(2.2rem, 5vw, 4rem); line-height: .98; margin: 0; letter-spacing: -.02em; }
+    .vp-fim h2 em { font-style: normal; color: #F2C66D; }
+    .vp-fim dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 14px 24px; font-size: 1rem; }
+    .vp-fim dt { color: #8FAE95; font-weight: 700; }
+    .vp-fim dd { margin: 0; }
+    .vp-fim a.vp-zap { display: inline-block; margin-top: 32px; background: #D98A6A; color: #2E3A3F; font-weight: 700; text-decoration: none; padding: 16px 28px; border-radius: 14px; }
+    .vp-fim small { display: block; max-width: 1080px; margin: 72px auto 0; color: #6B7A7E; font-size: .8rem; }
+    @media (max-width: 760px) { .vp-fim__in { grid-template-columns: 1fr; gap: 40px; } }
+    /* no rodapé a copy fixa do motor some: o texto do rodapé passa a ser o único texto da tela */
+    #world .sw-copylayer, #world .sw-route, #world .sw-hint { transition: opacity .45s ease; }
+    #world.no-copy .sw-copylayer, #world.no-copy .sw-route, #world.no-copy .sw-hint { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="top"></div>
+  <div id="world"></div>
+
+  <section class="vp-fim" id="agendar">
+    <div class="vp-fim__in">
+      <div>
+        <h2>Cuidando de<br><em>quem te espera</em> na porta.</h2>
+        <a class="vp-zap" href="#agendar">Falar no WhatsApp</a>
+      </div>
+      <dl>
+        <dt>Endereço</dt><dd>Rua Mato Grosso, 2071</dd>
+        <dt>Serviços</dt><dd>clínica veterinária · banho e tosa · pet shop</dd>
+        <dt>Atendimento</dt><dd>cães e gatos</dd>
+        <dt>Contato</dt><dd>pelo WhatsApp</dd>
+      </dl>
+    </div>
+    <small>Demonstração criada para a Zoopet Shop and Care. Os textos são uma proposta: horários, serviços e contato entram na versão final.</small>
+  </section>
+
+  <script src="scrub-engine.js"></script>
+  <script>
+    // VIDEOS=false volta ao modo só-cenas (sem clipes).
+    const VIDEOS = true;
+    const V = (u) => VIDEOS ? u : undefined;
+    mountScrollWorld(document.getElementById('world'), {
+      brand: { name: 'Zoopet', href: '#top' },
+      cta: { label: 'Agendar', href: '#agendar' },
+      hint: 'role para entrar',
+      diveScroll: 1.3,
+      connScroll: 0.9,
+      sections: [
+        { id: 'entrada', label: 'A Vila', still: 'assets/entrada.webp', stillMobile: 'assets/entrada-m.webp',
+          clip: V('assets/vid/entrada.mp4'), clipMobile: V('assets/vid/entrada-m.mp4'),
+          accent: '#D98A6A', scroll: 1.6, linger: 0.4,
+          eyebrow: 'Clínica veterinária · banho e tosa · pet shop',
+          title: 'Cuidado completo para cães e gatos.',
+          body: 'Consulta, banho e a loja no mesmo endereço, na Rua Mato Grosso.',
+          tags: ['Cães e gatos'] },
+        { id: 'consulta', label: 'Consulta', still: 'assets/consulta.webp', stillMobile: 'assets/consulta-m.webp',
+          clip: V('assets/vid/consulta.mp4'), clipMobile: V('assets/vid/consulta-m.mp4'),
+          accent: '#8FAE95',
+          eyebrow: 'Clínica veterinária',
+          title: 'Consulta sem pressa, sem susto.',
+          body: 'Atendimento calmo, com o veterinário explicando cada passo antes de fazer.',
+          tags: [] },
+        { id: 'banho', label: 'Banho e tosa', still: 'assets/banho.webp', stillMobile: 'assets/banho-m.webp',
+          clip: V('assets/vid/banho.mp4'), clipMobile: V('assets/vid/banho-m.mp4'),
+          accent: '#9CC3D5',
+          eyebrow: 'Banho e tosa',
+          title: 'Sai cheiroso. Volta feliz.',
+          body: 'Banho, tosa e paciência com quem não gosta muito de barulho.',
+          tags: [] },
+        { id: 'petshop', label: 'Pet shop', still: 'assets/petshop.webp', stillMobile: 'assets/petshop-m.webp',
+          clip: V('assets/vid/petshop.mp4'), clipMobile: V('assets/vid/petshop-m.mp4'),
+          accent: '#F2C66D',
+          eyebrow: 'Pet shop',
+          title: 'A ração certa, indicada por quem examinou.',
+          body: 'Alimentação, brinquedos e acessórios escolhidos junto com a equipe da clínica.',
+          tags: [] },
+        { id: 'creche', label: 'O espaço', still: 'assets/creche.webp', stillMobile: 'assets/creche-m.webp',
+          clip: V('assets/vid/creche.mp4'), clipMobile: V('assets/vid/creche-m.mp4'),
+          accent: '#8FAE95',
+          eyebrow: 'O espaço',
+          title: 'Um lugar pensado para eles.',
+          body: 'Ambiente amplo e seguro, com área separada para os gatos.',
+          tags: [] },
+        { id: 'finale', label: 'Agendar', still: 'assets/finale.webp', stillMobile: 'assets/finale-m.webp',
+          clip: V('assets/vid/finale.mp4'), clipMobile: V('assets/vid/finale-m.mp4'),
+          accent: '#D98A6A', scroll: 1.5, linger: 0.5,
+          eyebrow: 'Zoopet Shop and Care',
+          title: 'A casa deles fora de casa.',
+          body: 'Rua Mato Grosso, 2071. Agende a visita pelo WhatsApp.',
+          tags: [],
+          cta: { primary: { label: 'Falar no WhatsApp', href: '#agendar' },
+                 secondary: { label: 'Ver endereço', href: '#agendar' } } },
+      ],
+      connectors: VIDEOS ? [1,2,3,4,5].map(i => `assets/vid/conn${i}.mp4`) : [],
+      connectorsMobile: VIDEOS ? [1,2,3,4,5].map(i => `assets/vid/conn${i}-m.mp4`) : [],
+    });
+    // Quando o rodapé entra na tela, esmaece a copy fixa (e o trilho lateral) do motor.
+    const rodape = document.getElementById('agendar'), mundo = document.getElementById('world');
+    if (rodape && 'IntersectionObserver' in window) {
+      new IntersectionObserver(
+        es => es.forEach(e => mundo.classList.toggle('no-copy', e.isIntersecting)),
+        { threshold: 0.12 }
+      ).observe(rodape);
+    }
+  </script>
+</body>
+</html>
